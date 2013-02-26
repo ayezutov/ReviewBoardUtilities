@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Security;
+using System.ServiceModel;
 using System.ServiceProcess;
 using System.Threading;
 using ReviewBoardTfsAutoMerger.Log;

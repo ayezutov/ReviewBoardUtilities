@@ -97,6 +97,9 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Management" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.ServiceModel.Web" />
     <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -129,6 +132,7 @@
     <Compile Include="ReviewBoardTfsAutoPost.Designer.cs">
       <DependentUpon>ReviewBoardTfsAutoPost.cs</DependentUpon>
     </Compile>
+    <Compile Include="WebInterface\WebResponseHost.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config">
@@ -161,6 +165,20 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup />
+  <ItemGroup>
+    <Content Include="WebSite\Index.htm">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="WebSite\jquery-1.9.1.min.js">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="WebSite\MergeReviews.htm">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="WebSite\scripts\MergeReviews.js">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

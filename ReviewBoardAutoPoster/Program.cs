@@ -2,9 +2,13 @@
 using System.Configuration.Install;
 using System.IO;
 using System.Reflection;
+using System.ServiceModel;
+using System.ServiceModel.Description;
+using System.ServiceModel.Web;
 using System.ServiceProcess;
 using System.Threading;
 using ReviewBoardTfsAutoMerger.Log;
+using ReviewBoardTfsAutoMerger.WebInterface;
 
 namespace ReviewBoardTfsAutoMerger
 {
@@ -57,10 +61,23 @@ namespace ReviewBoardTfsAutoMerger
 
         public static void Run(ILog log)
         {
+
+
             AppDomain.CurrentDomain.UnhandledException += (sender, args) => log.Error(args.ExceptionObject.ToString());
+
+
+            var configuration = new Configuration.Configuration();
+            var host = new ServiceHost(new WebSiteService(), new Uri(string.Format("http://{0}:{1}", Environment.MachineName, configuration.WebSiteHost)));
+
+            host.AddServiceEndpoint(typeof(IWebSiteService), new WebHttpBinding(), "")
+                .Behaviors.Add(new WebHttpBehavior { DefaultOutgoingResponseFormat = WebMessageFormat.Json, DefaultOutgoingRequestFormat = WebMessageFormat.Json });
+            host.Open();
+            log.Info("Web communication host has been successfully opened");
+
+
             while (true)
             {
-                var configuration = new Configuration.Configuration();
+                
                 try
                 {
                     new AutomatedPostReview(log, configuration).Run();

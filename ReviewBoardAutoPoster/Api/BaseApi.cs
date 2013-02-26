@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Text;
 using System.Xml;
 
 namespace ReviewBoardTfsAutoMerger.Api
@@ -18,37 +19,9 @@ namespace ReviewBoardTfsAutoMerger.Api
         }
 
         private CookieContainer cookies;
-        protected XmlDocument GetXml(Uri uri, string verb, Dictionary<string, string> parameters = null, bool allowAutoRedirect = true) {
-            if (cookies == null)
-            {
-                PopulateCookie();
-            }
-            var request = (HttpWebRequest)WebRequest.Create(uri);
-            request.Method = verb;
-            request.Accept = "application/xml";
-            request.CookieContainer = cookies;
-            request.KeepAlive = false;
-            request.AllowAutoRedirect = allowAutoRedirect;
-            
-            if (parameters != null)
-            {
-                WriteMultiPartFormData(request, parameters);
-            }
-            var response = request.GetResponse();
-            string xml;
-            try
-            {
-                Stream responseStream = response.GetResponseStream();
-
-                if (responseStream == null)
-                    return null;
-
-                xml = new StreamReader(responseStream).ReadToEnd();
-            }
-            finally
-            {
-                response.Close();
-            }
+        protected XmlDocument GetXml(Uri uri, string verb, Dictionary<string, string> parameters = null, bool allowAutoRedirect = true)
+        {
+            var xml = GetValue(uri, verb, parameters, allowAutoRedirect, "application/xml");
             try
             {
                 var xmlDoc = new XmlDocument();
@@ -60,12 +33,46 @@ namespace ReviewBoardTfsAutoMerger.Api
                 return null;
             }
         }
+        
+        protected string GetValue(Uri uri, string verb, Dictionary<string, string> parameters = null, bool allowAutoRedirect = true, string accept = "*/*") {
+            if (cookies == null)
+            {
+                PopulateCookie();
+            }
+            var request = (HttpWebRequest)WebRequest.Create(uri);
+            request.Method = verb;
+            request.Accept = accept;
+            request.CookieContainer = cookies;
+            request.KeepAlive = false;
+            request.AllowAutoRedirect = allowAutoRedirect;
+            
+            if (parameters != null)
+            {
+                WriteMultiPartFormData(request, parameters);
+            }
+            var response = request.GetResponse();
+            string value;
+            try
+            {
+                Stream responseStream = response.GetResponseStream();
+
+                if (responseStream == null)
+                    return null;
+
+                value = new StreamReader(responseStream).ReadToEnd();
+            }
+            finally
+            {
+                response.Close();
+            }
+            return value;
+        }
 
         private void PopulateCookie()
         {
-            var request = (HttpWebRequest)WebRequest.Create(new Uri(siteUri + "api/users/"));
-            request.Credentials = credentials;
-            request.PreAuthenticate = true;
+            var request = (HttpWebRequest)WebRequest.Create(new Uri(siteUri + "api/"));
+            string credentialsString = Convert.ToBase64String(ASCIIEncoding.ASCII.GetBytes( string.Format("{0}:{1}", credentials.UserName, credentials.Password)));
+            request.Headers.Add("Authorization", "Basic " + credentialsString);
             request.KeepAlive = false;
             cookies = new CookieContainer();
             request.CookieContainer = cookies;
@@ -83,12 +90,20 @@ namespace ReviewBoardTfsAutoMerger.Api
             foreach (var parameter in parameters)
             {
                 requestWriter.WriteLine(string.Format("--{0}", boundary));
-                requestWriter.WriteLine(string.Format("Content-Disposition: form-data; name=\"{0}\"", parameter.Key));
+                var name = parameter.Key;
+                var fileName = string.Empty;
+                if (parameter.Key.Contains("/"))
+                {
+                    var split = parameter.Key.Split('/');
+                    name = split[0];
+                    fileName = split[1];
+                }
+                requestWriter.WriteLine(string.Format("Content-Disposition: form-data; name=\"{0}\"{1}", name, string.IsNullOrEmpty(fileName) ? string.Empty : string.Format("; filename=\"{0}\"", fileName)));
                 requestWriter.WriteLine();
                 requestWriter.WriteLine(parameter.Value);
             }
 
-            requestWriter.WriteLine(string.Format("--{0}", boundary));
+            requestWriter.WriteLine(string.Format("--{0}--", boundary));
             requestWriter.Flush();
         }
     }

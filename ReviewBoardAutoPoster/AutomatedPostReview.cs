@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.DirectoryServices.AccountManagement;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -64,6 +65,12 @@ namespace ReviewBoardTfsAutoMerger
         {
             var result = RunPostReview(changeset);
 
+            if (result.SkipRevision)
+            {
+                config.LastProcessedChangesetId = changeset.ChangesetId;
+                return true;
+            }
+
             if (result.IsSuccess)
             {
                 if (result.ReviewId > 0)
@@ -110,8 +117,8 @@ namespace ReviewBoardTfsAutoMerger
             ReviewRequest reviewRequest = GetRootReviewRequest(changeset);
 
             var reviewConfig =
-                config.CodeReviewer.CodeReviewersInfo.FirstOrDefault(cr => string.Equals(commiterName, cr.Name, StringComparison.InvariantCulture))
-                ?? config.CodeReviewer.CodeReviewersInfo.FirstOrDefault(cr => commiterSecurityGroups.Any(sg => string.Equals(sg.Name, cr.SecurityGroup, StringComparison.InvariantCulture)))
+                config.CodeReviewer.CodeReviewersInfo.FirstOrDefault(cr => string.Equals(commiterName, cr.Name, StringComparison.InvariantCultureIgnoreCase))
+                ?? config.CodeReviewer.CodeReviewersInfo.FirstOrDefault(cr => commiterSecurityGroups.Any(sg => string.Equals(sg.Name, cr.SecurityGroup, StringComparison.InvariantCultureIgnoreCase)))
                     ?? (config.CodeReviewer.CodeReviewersInfo.FirstOrDefault(cr => string.Equals(cr.Name, "Default")))
                         ?? new CodeReviewersReviewerInfo
                                {
@@ -157,6 +164,7 @@ namespace ReviewBoardTfsAutoMerger
 
             process.EnableRaisingEvents = true;
 
+            bool hasExceptionToSkip = false;
             DataReceivedEventHandler dataReceived = (sender, e) =>
                                                         {
                                                             var regexString = Regex.Escape(config.ReviewBoardServer + "/r/") +
@@ -171,6 +179,12 @@ namespace ReviewBoardTfsAutoMerger
                                                                 log.Info("Found match for reviewId");
                                                                 result = int.Parse(match.Groups["reviewId"].Value);
                                                             }
+
+                                                            if (line != null && line.Contains("svn.py\", line 268, in convert_to_absolute_paths"))
+                                                            {
+                                                                hasExceptionToSkip = true;
+                                                            }
+
                                                         };
 
             process.OutputDataReceived += dataReceived;
@@ -178,6 +192,15 @@ namespace ReviewBoardTfsAutoMerger
 
 
             process.WaitForExit();
+
+            if (hasExceptionToSkip)
+            {
+                log.Warning("Skipping revision");
+                return new PostReviewResult
+                           {
+                               SkipRevision = true
+                           };
+            }
             if (process.ExitCode != 0)
             {
                 log.Error(string.Format("post-review existed with code '{0}'", process.ExitCode));
@@ -219,10 +242,10 @@ namespace ReviewBoardTfsAutoMerger
             FormCommonAuthenticationAndRepositoryParameters(changeset, commiterName, sb);
 
             sb.AppendFormat(@" --summary=""C{0}: {1}""", changeset.ChangesetId,
-                                              changeset.Comment.Split(new[] {Environment.NewLine}, StringSplitOptions.RemoveEmptyEntries).
-                                                  FirstOrDefault());
-            sb.AppendFormat(" --description=\"Review for chageset {0} by {1}:\r\n{2}\"", changeset.ChangesetId,
-                                              changeset.Committer, changeset.Comment);
+                                              CmdEscape(changeset.Comment.Split(new[] {Environment.NewLine}, StringSplitOptions.RemoveEmptyEntries).
+                                                  FirstOrDefault()));
+            sb.AppendFormat(" --description=\"Review for chageset {0} by {1}:\r\n{2}\"", CmdEscape(changeset.ChangesetId.ToString(CultureInfo.InvariantCulture)),
+                                              changeset.Committer, CmdEscape(changeset.Comment));
 
             if (reviewConfig.Groups.Any())
             {
@@ -237,6 +260,13 @@ namespace ReviewBoardTfsAutoMerger
             sb.AppendFormat(@" --publish");
         }
 
+        private string CmdEscape(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+                return s;
+            return s.Replace("\"", "\\\"");
+        }
+
         private void FormCommonAuthenticationAndRepositoryParameters(Changeset changeset, string commiterName, StringBuilder sb)
         {
             sb.AppendFormat(@" --repository-url=""{0}""", config.SvnServer);
@@ -244,7 +274,7 @@ namespace ReviewBoardTfsAutoMerger
             sb.AppendFormat(@" --username=""{0}""", config.ReviewBoardUserName);
             sb.AppendFormat(@" --password=""{0}""", config.ReviewBoardPassword);
             sb.AppendFormat(@" --submit-as=""{0}""",
-                            users.Any(u => u.Equals(commiterName)) ? commiterName : config.NotExistentUserName);
+                            users.Any(u => u.Equals(commiterName, StringComparison.InvariantCultureIgnoreCase)) ? commiterName : config.NotExistentUserName);
             sb.AppendFormat(@" --revision-range=""{0}:{1}""", changeset.ChangesetId - 1, changeset.ChangesetId);
         }
 

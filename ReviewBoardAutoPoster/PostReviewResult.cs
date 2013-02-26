@@ -12,5 +12,7 @@ namespace ReviewBoardTfsAutoMerger
         public bool IsNewRequest { get; set; }
 
         public bool IsSuccess { get; set; }
+
+        public bool SkipRevision { get; set; }
     }
 }

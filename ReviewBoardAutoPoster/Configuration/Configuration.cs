@@ -2,10 +2,12 @@
 using System.Configuration;
 using System.DirectoryServices.AccountManagement;
 using System.Globalization;
+using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
 
 namespace ReviewBoardTfsAutoMerger.Configuration
 {
+    [DataContract]
     public class Configuration
     {
         private static readonly Regex referenceToPrevious = new Regex(@"\s*\[RootChangeset\#(?<id>\d+)\][\s\:]*");
@@ -15,21 +17,28 @@ namespace ReviewBoardTfsAutoMerger.Configuration
         public Regex ReferenceToPrevious
         {
             get { return referenceToPrevious; }
+            private set { }
         }
 
+        [DataMember]
         public string ReviewBoardServer
         {
             get { return ConfigurationManager.AppSettings["reviewBoard.url"]; }
+            private set { }
         }
 
+        [DataMember]
         public string ReviewBoardUserName
         {
             get { return ConfigurationManager.AppSettings["reviewBoard.user"]; }
+            private set { }
         }
 
+        [DataMember]
         public string ReviewBoardPassword
         {
             get { return ConfigurationManager.AppSettings["reviewBoard.password"]; }
+            private set { }
         }
 
         public Uri ServerUri
@@ -95,5 +104,7 @@ namespace ReviewBoardTfsAutoMerger.Configuration
         {
             get { return ConfigurationManager.AppSettings["not.existing.user"] ?? "not-existing"; }
         }
+
+        public int WebSiteHost { get { return int.Parse(ConfigurationManager.AppSettings["website.port"] ?? "0"); } }
     }
 }
